@@ -1,0 +1,355 @@
+#include <cstdio>
+#include <cstring>
+#include <vector>
+#include <algorithm>
+#include <map>
+#include <assert.h>
+#include <iostream>
+#include <cmath>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
+using namespace std;
+
+struct Node{
+	Node *l,*r,*p;
+	int label,v,u;
+	Node(){
+		l = r = p = 0;
+		label = v = u = 0;
+	}	
+	Node( int label , int u, int v ){
+		this->label = label;
+		this->u = u;
+		this->v = v;
+		l = r = p = 0;
+	}
+};
+
+int n,q;
+Node *Head[1000005];
+unordered_map < int, int > Pairs[600005];
+set < pair < int , int > > Set;
+char cmd[15];
+int A,B, idx = 0;
+
+void rotl( Node *x ){
+	Node *y = x->r;
+	if ( y ){
+		x->r = y->l;
+		if ( y->l ) y->l->p = x;
+		y->p = x->p;
+	}
+
+	if ( x->p ){
+		if ( x == x->p->l ) x->p->l = y;
+		else x->p->r = y;
+	}
+	if ( y ) y->l = x;
+	x->p = y;
+}
+
+void rotr( Node *x ){
+	Node *y = x->l;
+	if ( y ){
+		x->l = y->r;
+		if ( y->r ) y->r->p = x;
+		y->p = x->p;
+	}
+	if ( x->p ){
+		if ( x == x->p->l ) x->p->l = y;
+		else x->p->r = y;
+	}
+	if ( y ) y->r = x;
+	x->p = y;
+}
+
+void splay( Node *x ){
+	if ( !x ) return ;
+	while ( x->p ){
+		if ( !x->p->p ){
+			if ( x->p->l == x ) rotr(x->p);
+			else rotl(x->p);
+		} else if ( x->p->l == x && x->p->p->l == x->p ){
+			rotr(x->p->p);
+			rotr(x->p);
+		} else if ( x->p->r == x && x->p->p->r == x->p ){
+			rotl(x->p->p);
+			rotl(x->p);
+		} else if ( x->p->l == x && x->p->p->r == x->p ){
+			rotr(x->p);
+			rotl(x->p);
+		} else {
+			rotl(x->p);
+			rotr(x->p);
+		}
+	}
+}
+
+Node *lowestRank( Node *y ){
+	if ( !y ) return y;
+	Node *x = y;
+	splay(x);
+	while ( x && x->l ) x = x->l;
+	splay(x);
+	return x;
+}
+
+Node *highestRank( Node *y ){
+	if ( !y ) return y;
+	Node *x = y;
+	splay(x);
+	while ( x && x->r ) x = x->r;
+	splay(x);
+	return x;
+}
+
+void merge( Node *x, Node *y ){
+	if ( !x || !y ) return;
+	if ( lowestRank(x) == lowestRank(y) ) assert(1==2);
+	Node *R = highestRank(x);
+	splay(y);
+	splay(R);
+	R->r = y;
+	y->p = R;
+	splay(y);
+}
+
+bool Smaller( Node *x , Node *y ){
+	splay(x);
+	Node *z = x->r;
+	if ( !z ) return false;
+	z->p = 0;
+	x->r = 0;
+	if ( lowestRank(x) == lowestRank(y) ) {
+		merge(x,z);
+		return false;
+	}
+	merge(x,z);
+	return true;
+}
+
+Node *reroot( int u ){
+	auto it = Set.lower_bound(make_pair(u,-1));
+	if ( it == Set.end() || it->first != u ) return 0;
+	int v = it->second;
+	int iuv = Pairs[u][v], ivu = Pairs[v][u];
+
+	// cout << "u,v = " << u << " " << v << endl;
+	if ( Smaller(Head[iuv], Head[ivu]) ){
+		// cout << "pass smaller\n";
+		splay(Head[iuv]);
+		Node *Luv = Head[iuv]->l, *Ruv = Head[iuv]->r;
+		if ( Luv ){
+			Luv->p = 0;
+			Head[iuv]->l = 0;
+			Luv = highestRank(Luv);
+		}
+		if ( Ruv ){
+			Ruv->p = 0;
+			Head[iuv]->r = 0;
+			Ruv = lowestRank(Ruv);
+		}
+
+		splay(Head[ivu]);
+		Node *Lvu = Head[ivu]->l, *Rvu = Head[ivu]->r;
+		if ( Lvu ){
+			Lvu->p = 0;
+			Head[ivu]->l = 0;
+			Lvu = highestRank(Lvu);
+		}
+		if ( Rvu ){
+			Head[ivu]->r = 0;
+			Rvu->p = 0;
+			Rvu = lowestRank(Rvu);
+		}
+		if ( lowestRank(Ruv) == lowestRank(Head[ivu]) ) Ruv = Lvu;
+		// cout << "passpoint 2\n";
+		merge(Head[iuv], Ruv);
+		merge(Head[iuv], Head[ivu]);
+		merge(Head[iuv], Rvu);
+		merge(Head[iuv], Luv);
+	} else {
+
+		splay(Head[ivu]);
+		Node *Lvu = Head[ivu]->l, *Rvu = Head[ivu]->r;
+		if ( Lvu ){
+			Lvu->p = 0;
+			Head[ivu]->l = 0;
+			Lvu = highestRank(Lvu);
+		}
+		if ( Rvu ){
+			Head[ivu]->r = 0;
+			Rvu->p = 0;
+			Rvu = lowestRank(Rvu);
+		}
+		// cout << "pass here\n";
+		splay(Head[iuv]);
+		Node *Luv = Head[iuv]->l, *Ruv = Head[iuv]->r;
+		if ( Luv ){
+			Luv->p = 0;
+			Head[iuv]->l = 0;
+			Luv = highestRank(Luv);
+		}
+		if ( Ruv ){
+			Ruv->p = 0;
+			Head[iuv]->r = 0;
+			Ruv = lowestRank(Ruv);
+		}		
+		if ( lowestRank(Rvu) == lowestRank(Head[iuv]) ) Rvu = Luv;
+
+		merge(Head[iuv], Ruv);
+		merge(Head[iuv], Lvu);
+		merge(Head[iuv], Head[ivu]);
+		merge(Head[iuv], Rvu);
+	}
+
+	// for ( auto it : Set ){
+	// 		printf("%d %d\n",it.first, it.second);
+	// 	}
+	// 	for ( int i = 1; i <= idx; i++ ){
+	// 		printf("idx = %d, u = %d, v = %d\n",i, Head[i]->u, Head[i]->v);
+	// 		printf("L = %d, R = %d, P = %d\n",(Head[i]->l)?Head[i]->l->label:0, (Head[i]->r)?Head[i]->r->label:0, (Head[i]->p)?Head[i]->p->label:0);
+	// 	}
+	splay(Head[iuv]);
+	return Head[iuv];
+}
+
+void link( int u, int v ){
+	if ( Pairs[u][v] == 0 ){
+		Pairs[u][v] = ++idx;
+		Head[idx] = new Node(idx,u,v);
+		Pairs[v][u] = ++idx;
+		Head[idx] = new Node(idx,v,u);
+		merge(Head[idx-1], Head[idx]);
+	} 
+
+	int iuv = Pairs[u][v], ivu = Pairs[v][u];
+	if ( Smaller(Head[iuv], Head[ivu]) == false ) {
+		swap(iuv,ivu); swap(u,v); 
+	}
+	Node *x = reroot(u);
+	Node *y = reroot(v);
+
+	splay(Head[iuv]);
+	Node *z = Head[iuv]->r;
+	if ( z ) {
+		z->p = 0;
+		Head[iuv]->r = 0;
+	}
+	// cout << iuv << " " << Head[iuv]->label << "-==============\n";
+	// if ( z ) cout << "z === " << z->label << endl;
+	if ( x ){
+		merge(x, Head[iuv]);
+		merge(x,y);
+		merge(x,Head[ivu]);
+	} else {
+		merge(Head[iuv],y);
+		merge(Head[iuv], Head[ivu]);
+	}
+	splay(Head[iuv]);
+	Set.insert(make_pair(u,v));
+	Set.insert(make_pair(v,u));
+}
+
+void cut( int u, int v ){
+	int idu = Pairs[u][v], idv = Pairs[v][u];
+	Node *uv = Head[idu], *vu = Head[idv];
+
+	if ( Smaller(uv,vu) ){
+		splay(uv);
+		Node *Lu = uv->l, *Ru = uv->r;
+		if ( Lu ){
+			Lu->p = 0;
+			uv->l = 0;
+		} 
+		if ( Ru ){
+			Ru->p = 0;
+			uv->r = 0;
+		}
+		splay(vu);
+		Node *Lv = vu->l, *Rv = vu->r;
+		if ( Lv ){
+			Lv->p = 0;
+			vu->l = 0;
+		}
+		if ( Rv ){
+			Rv->p = 0;
+			vu->r = 0;
+		}
+		merge(uv,vu);
+		merge(Lu,Rv);
+	} else {
+
+		splay(uv);
+		Node *Lu = uv->l, *Ru = uv->r;
+		if ( Lu ){
+			Lu->p = 0;
+			uv->l = 0;
+		} 
+		if ( Ru ){
+			Ru->p = 0;
+			uv->r = 0;	
+		}
+		splay(vu);
+		Node *Lv = vu->l, *Rv = vu->r;
+		if ( Lv ){
+			Lv->p = 0;
+			vu->l = 0;
+		}
+		if ( Rv ){
+			Rv->p = 0;
+			vu->r = 0;
+		}
+		merge(vu,uv);
+		merge(Lv,Ru);
+	}
+	Set.erase(Set.find(make_pair(u,v)));
+	Set.erase(Set.find(make_pair(v,u)));
+}
+
+int isConnected( int u, int v ){
+
+	auto it = Set.lower_bound(make_pair(u,-1));
+	if ( u == v ) return true;
+	if ( it == Set.end() || it->first != u ) return false;
+	int idu = Pairs[it->first][it->second];
+
+	it = Set.lower_bound(make_pair(v,-1));
+	if ( it == Set.end() || it->first != v ) return false;
+	int idv = Pairs[it->first][it->second];
+	// cout << idu << " " << Head[idu]->u << " " << Head[idu]->v << endl;
+	// cout << idv << " " << Head[idv]->u << " " << Head[idv]->v << endl;
+
+	Node *root_u = lowestRank(Head[idu]);
+	Node *root_v = lowestRank(Head[idv]);
+	// cout << root_u->u << " " << root_u->v << endl;
+	// cout << root_v->u << " " << root_v->v << endl;
+	return root_v == root_u;
+}
+
+int main(){
+
+	scanf("%d%d",&n,&q);
+	idx = 0;
+
+	while ( q-- ){
+		scanf("%s%d%d",&cmd,&A,&B);
+		if ( cmd[0] == 'a' ){
+			link(A,B);
+		} else if ( cmd[0] == 'r' ){
+			cut(A,B);
+		} else if ( cmd[0] == 'c' ){
+			if ( isConnected(A,B) ) printf("YES\n");
+			else printf("NO\n");
+		}
+		// for ( auto it : Set ){
+		// 	printf("%d %d\n",it.first, it.second);
+		// }
+		// for ( int i = 1; i <= idx; i++ ){
+		// 	printf("idx = %d, u = %d, v = %d\n",i, Head[i]->u, Head[i]->v);
+		// 	printf("L = %d, R = %d, P = %d\n",(Head[i]->l)?Head[i]->l->label:0, (Head[i]->r)?Head[i]->r->label:0, (Head[i]->p)?Head[i]->p->label:0);
+		// }
+	}
+	return 0;
+}
