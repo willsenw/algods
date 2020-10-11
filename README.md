@@ -1,2 +1,2 @@
 # algods
-Original Own Code
+original code
